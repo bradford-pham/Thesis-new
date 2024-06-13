@@ -1,0 +1,35 @@
+---
+title: "Thesis"
+output: html
+date: "2024-06-12"
+---
+```{r}
+library(tidyverse)
+```
+
+```{r}
+data <- read.csv("Thesis data.csv")
+
+#mutate data
+
+new_data <- data.frame(edu_bl = c("8th grade or less", 
+                              "Some high school, no diploma or GED", 
+                              "Some college, no degree (including currently                                                             in college)", 
+                              "Some graduate work, no graduate degree",
+                              "Other category"))
+data <- data %>%
+  mutate(edu_bl = case_when(
+    edu_bl == "8th grade or less" ~ "Less than High School",
+    edu_bl == "Some high school, no diploma or GED" ~ "Less than High School",
+    edu_bl == "Some college, no degree (including currently in college)" ~ "High school graduate/GED",
+    edu_bl == "Some graduate work, no graduate degree" ~ "Bachelor's degree",
+    TRUE ~ edu_bl  # Retain other values as they are
+  ))
+
+contingency_table <- table(data$race, data$edu_bl)
+
+print("Contingency table using table():")
+print(contingency_table)
+
+```
+

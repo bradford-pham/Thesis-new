@@ -1,0 +1,41 @@
+---
+title: "Thesis"
+author: "Brady Pham"
+date: 2024-06-13
+output: github_document
+## 
+---
+```{r}
+library(tidyverse)
+```
+
+```{r}
+data <- read.csv("Thesis data.csv")
+
+#Cleaning Education variable
+
+data <- data %>%
+  mutate(edu_bl = case_when(
+    edu_bl == "8th grade or less" ~ "Less than High School",
+    edu_bl == "Some high school, no diploma or GED" ~ "Less than High School",
+    edu_bl == "Some college, no degree (including currently in college)" ~ "High school graduate/GED",
+    edu_bl == "Some graduate work, no graduate degree" ~ "Bachelor's degree",
+    edu_bl == "Bachelor's degree" ~ "Bachelor's degree",
+    edu_bl == "Bachelor’s degree" ~ "Bachelor's degree",
+    TRUE ~ edu_bl 
+  ))
+
+#Cleaning Race Variable
+data <- data %>%
+  mutate(race = case_when( 
+    race %in% c("American Indian", "Asian/Asian American", "Middle Eastern/North African") ~"Other",
+    TRUE ~ race
+    ))
+
+
+
+race_education_table <- table(data$race, data$edu_bl)
+print(race_education_table)
+
+```
+

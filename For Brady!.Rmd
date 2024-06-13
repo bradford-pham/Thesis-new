@@ -1,0 +1,121 @@
+---
+title: "PrEP Use Patterns"
+author: "Alex Furuya"
+date: '2023-10-18'
+output: html_document
+---
+
+# Set Up
+
+```{r, warning = FALSE, message = FALSE}
+setwd("/Users/alexfuruya/Desktop/TURNNT")
+
+# Set Up Libraries
+library(tidyverse)
+library(MASS)
+
+# Import Data
+data <- read.csv("TURNNT_BaselineV1_Qualtrics_CleanedString_2022-11-09.csv") %>%
+  dplyr::select(-X) %>%
+  filter(hiv_status_bl == "Negative") %>%
+  
+  # Clean Up Exposure Variable
+  mutate(sexwork_money_bl = ifelse(sexwork_money_bl == "No, never", "Never Sex Work", sexwork_money_bl)) %>%
+  mutate(sexwork_money_bl = ifelse(sexwork_money_bl == "Yes, but not within the past six months", "Former Sex Work", sexwork_money_bl)) %>%
+  mutate(sexwork_money_bl = ifelse(sexwork_money_bl == "Yes, within the past six months", "Current Sex Work", sexwork_money_bl)) %>%
+  mutate(sexwork_money_bl = factor(sexwork_money_bl, levels = c("Never Sex Work", "Former Sex Work", "Current Sex Work"))) %>%
+
+  # Clean Up Outcome Variable
+  mutate(prep_use_bl = ifelse(prep_use_bl == "No, never", "Never PrEP", prep_use_bl)) %>%
+  mutate(prep_use_bl = ifelse(prep_use_bl == "Yes, have taken PrEP previously but am not currently", "Former PrEP", prep_use_bl)) %>%
+  mutate(prep_use_bl = ifelse(prep_use_bl == "Yes, taking PrEP now", "Current PrEP", prep_use_bl)) %>%
+  mutate(prep_use_bl = factor(prep_use_bl, levels = c("Never PrEP", "Former PrEP", "Current PrEP"))) %>%
+  
+  # Clean Up Confounder Variable
+  mutate(income_bin_bl = income_bl) %>%
+  mutate(income_bin_bl = ifelse(income_bin_bl == "No income", "< $10,000", income_bin_bl)) %>%
+  mutate(income_bin_bl = ifelse(income_bin_bl == "$1 to  $9,999", "< $10,000", income_bin_bl)) %>%
+  mutate(income_bin_bl = ifelse(income_bin_bl == "$10,000 to  $29,999", "$10,000 and more", income_bin_bl)) %>%
+  mutate(income_bin_bl = ifelse(income_bin_bl == "$30,000 to  $49,999", "$10,000 and more", income_bin_bl)) %>%
+  mutate(income_bin_bl = ifelse(income_bin_bl == "$50,000 to  $74,999", "$10,000 and more", income_bin_bl)) %>%
+  mutate(income_bin_bl = ifelse(income_bin_bl == "$75,000 to  $99,999", "$10,000 and more", income_bin_bl)) %>%
+  mutate(income_bin_bl = ifelse(income_bin_bl == "$100,000 to  $149,999", "$10,000 and more", income_bin_bl)) %>%
+  mutate(income_bin_bl = ifelse(income_bin_bl == "Don't know", NA, income_bin_bl)) %>%
+  mutate(income_bin_bl = ifelse(income_bin_bl == "Prefer not to answer", NA, income_bin_bl)) %>%
+  
+  # Keep Only Complete Rows
+  filter(!is.na(prep_use_bl)) %>%
+  filter(!is.na(sexwork_money_bl)) %>%
+  filter(!is.na(income_bin_bl))
+```
+
+# Example of Descriptive Statistics
+
+```{r, warning = FALSE, message = FALSE}
+data %>%
+  group_by(sexwork_money_bl) %>%
+  summarise(Count = n()) %>%
+  ungroup() %>%
+  mutate(`Proportion (%)` = round(Count/sum(Count), 3)*100)
+
+data %>%
+  group_by(prep_use_bl) %>%
+  summarise(Count = n()) %>%
+  ungroup() %>%
+  mutate(`Proportion (%)` = round(Count/sum(Count), 3)*100)
+
+data %>%
+  group_by(income_bin_bl) %>%
+  summarise(Count = n()) %>%
+  ungroup() %>%
+  mutate(`Proportion (%)` = round(Count/sum(Count), 3)*100)
+```
+
+# Example of Bivariate Associations
+
+### Exposure and Outcome
+
+```{r, warning = FALSE, message = FALSE}
+table(data$sexwork_money_bl, data$prep_use_bl)
+chisq.test(table(data$sexwork_money_bl, data$prep_use_bl))
+```
+
+### Exposure and Confounder
+
+```{r, warning = FALSE, message = FALSE}
+table(data$sexwork_money_bl, data$income_bin_bl)
+chisq.test(table(data$sexwork_money_bl, data$income_bin_bl))
+```
+
+### Outcome and Confounder
+
+```{r, warning = FALSE, message = FALSE}
+table(data$prep_use_bl, data$income_bin_bl)
+chisq.test(table(data$prep_use_bl, data$income_bin_bl))
+```
+
+# Example of Ordinal Regression
+
+```{r, warning = FALSE, message = FALSE}
+# Create Model
+fit <- polr(prep_use_bl ~ sexwork_money_bl + income_bin_bl, data = data, Hess=TRUE)
+ci <- confint(fit)
+
+# Find Coefficients and Confidence Intervals
+exp(cbind(OR = coef(fit), ci))
+```
+
+# Check Proportional Odds Assumption
+
+```{r, warning = FALSE, message = FALSE}
+data <- data %>%
+  # Creating Cut Off for Y ≤ 0
+  mutate(former_current_prep_use_bl = ifelse(prep_use_bl == "Former PrEP" | prep_use_bl == "Current PrEP", 1, 0)) %>%
+  # Creating Cut Off for Y ≤ 1
+  mutate(current_prep_use_bl = ifelse(prep_use_bl == "Current PrEP", 1, 0))
+
+fit.binary1 <- glm(former_current_prep_use_bl ~ sexwork_money_bl + income_bin_bl, family = binomial, data = data)
+fit.binary2 <- glm(current_prep_use_bl ~ sexwork_money_bl + income_bin_bl, family = binomial, data = data)
+fit.binary1
+fit.binary2
+```
