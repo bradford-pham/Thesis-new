@@ -17,15 +17,16 @@ library(epitools)
 data <- read.csv("Thesis data.csv")
 
 #Cleaning Education variable
-
 data <- data %>%
   mutate(edu_bl = case_when(
     edu_bl == "8th grade or less" ~ "Less than High School",
     edu_bl == "Some high school, no diploma or GED" ~ "Less than High School",
     edu_bl == "Some college, no degree (including currently in college)" ~ "High school graduate/GED",
-    edu_bl == "Some graduate work, no graduate degree" ~ "Bachelor's degree",
-    edu_bl == "Bachelor's degree" ~ "Bachelor's degree",
-    edu_bl == "Bachelor’s degree" ~ "Bachelor's degree",
+    edu_bl == "Some graduate work, no graduate degree" ~ "Greater than High School",
+    edu_bl == "Bachelor's degree" ~ "Greater than High School",
+    edu_bl == "Bachelor’s degree" ~ "Greater than High School",
+    edu_bl == "Associate degree in college" ~ "Greater than High School",
+    edu_bl == "Graduate degree (Master’s/Doctoral/Professional degree)" ~ "Greater than High School",
     TRUE ~ edu_bl 
   ))
 
@@ -36,17 +37,73 @@ data <- data %>%
     TRUE ~ race
     ))
 
-#Race and education table 
-race_education_table <- table(data$race, data$edu_bl)
-print(race_education_table)
+#Cleaning Income
+data <- data |>
+  mutate(income_bl = ifelse(income_bl %in% c("Don't know", "Prefer not to answer"), NA, income_bl)) |>
+  mutate(income_bl = case_when(
+    income_bl %in% c("No income", "$1 to  $9,999") ~ "Less than $10,000", 
+    income_bl %in% c("$10,000 to  $29,999", "$100,000 to  $149,999", "$30,000 to  $49,999",
+                     "$50,000 to  $74,999", "$75,000 to  $99,999") ~ "Greater than $10,000",
+    TRUE ~ income_bl
+  ))
+
+#Cleaning health and status
+data <- data %>%
+  mutate(health_bl = case_when(
+    health_bl == "Excellent" ~ "Good",
+    health_bl == "Good" ~ "Good",
+    health_bl == "Very Good" ~ "Good",
+    health_bl == "Fair" ~ "Fair/Poor",
+    health_bl == "Poor" ~ "Fair/Poor",
+    TRUE ~ health_bl
+  ))
+
+#Cleaning having insurance 
+data <- data %>%
+  mutate(insurance_bl = case_when(
+    insurance_bl %in% c("Yes, for all 6 months", "Yes, for part of the 6 months") ~ "Yes",
+    TRUE ~ insurance_bl
+      ))
+
+#Cleaning Denied insurance 
+
+data <- data |> 
+  mutate(insurance_denied_transcare_bl = ifelse(insurance_denied_transcare_bl %in% c("Don't know", "You have not asked for this"), NA, insurance_denied_transcare_bl)) |>
+  mutate(insurance_denied_transcare_bl = case_when(
+    insurance_denied_transcare_bl %in% c("Yes, but not within the past 6 months", "Yes, within the past 6 months") ~ "Yes",
+    TRUE ~ insurance_denied_transcare_bl
+  ))
+
+#Cleaning Healthcare discrimination
+data <- data |> 
+  mutate(dscrm_hc_bl = case_when(
+    dscrm_hc_bl %in% c("All or almost all of the time", "Don't know", "Most of the time", "Sometimes")
+    ~ "Yes",
+    TRUE ~ dscrm_hc_bl
+  ))
+
+#Cleaning Dr denied
+data <- data |> 
+  mutate(dr_denied_transcare_bl = case_when(
+    dr_denied_transcare_bl %in% c("Yes, but not within the past 6 months", "Don't know", "Yes, within the past 6 months")
+    ~ "Yes",
+    TRUE ~ dr_denied_transcare_bl
+  ))
+
+
+
 
 ```
 
 ```{r}
+#Race and education table 
+race_education_table <- table(data$race, data$edu_bl)
+print(race_education_table)
+
 #Race and education odds ratio and chisquare
 
 odds_ratio_education <- oddsratio(race_education_table)
-print(odds_education)
+print(odds_ratio_education)
 
 chi_square_test_education <- chisq.test(race_education_table)
 print(chi_square_test_education)
@@ -54,51 +111,29 @@ print(chi_square_test_education)
 ```
 
 
-
 ```{r}
-#Income table
-filtered_data <- data %>%
-  filter(income_bl != "Don't know" & income_bl != "Prefer not to answer")
-
-race_income_table <- table(filtered_data$race, filtered_data$income_bl)
+#Income and race table 
+race_income_table <- table(data$race, data$income_bl)
 print(race_income_table)
 
-```
-
-
-```{r}
 #income and race odds ratio and income
-
 odds_ratio_income <- oddsratio(race_income_table)
 print(odds_ratio_income)
 
 chi_square_test_income <- chisq.test(race_income_table)
 print(chi_square_test_income)
 
+
 ```
+
 
 
 ```{r}
 #Health status and race table
-
-data <- data %>%
-  mutate(health_bl = case_when(
-    health_bl == "Excellent" ~ "Good",
-    health_bl == "Good" ~ "Good",
-    health_bl == "Very Good" ~ "Good",
-    health_bl == "Fair" ~ "Fair Poor",
-    health_bl == "Poor" ~ "Fair Poor",
-    TRUE ~ health_bl
-  ))
-
-health_race_table <- table(data$health_bl, data$race)
+health_race_table <- table(data$race,data$health_bl)
 print(health_race_table)
 
-```
-
-```{r}
 #Health status and race odds ratio and chi square
-
 odds_ratio_health <- oddsratio(health_race_table)
 print(odds_ratio_health)
 
@@ -109,22 +144,10 @@ print(chi_square_test_health)
 
 
 ```{r}
-#Having insurance and race
-data <- data %>%
-  mutate(insurance_bl = case_when(
-    insurance_bl %in% c("Yes, for all 6 months", "Yes, for part of the 6 months") ~ "Yes",
-    TRUE ~ insurance_bl
-      ))
-
-
-
-insurance_race_table <- table(data$insurance_bl, data$race)
+#Having insurance and race table
+insurance_race_table <- table(data$race, data$insurance_bl)
 print(insurance_race_table)
 
-
-```
-
-```{r}
 #Having insurance and race odds ratio and chi square
 odds_ratio_insurance <- oddsratio(insurance_race_table)
 print(odds_ratio_insurance)
@@ -138,20 +161,9 @@ print(chi_square_test_insurance)
 
 ```{r}
 #Denied insurance and race table 
-denied_insurance_data <- data |> 
-  filter(insurance_denied_transcare_bl != "Don't know" & insurance_denied_transcare_bl != "You have not asked for this") |> 
-  mutate(insurance_denied_transcare_bl = case_when(
-    insurance_denied_transcare_bl %in% c("Yes, but not within the past 6 months","Yes, within the past 6 months") ~ "Yes",
-    TRUE ~ insurance_denied_transcare_bl
-  ))
-
-insurance_denied_table <- table(denied_insurance_data$insurance_denied_transcare_bl, 
-                                denied_insurance_data$race)
+insurance_denied_table <- table(data$race, data$insurance_denied_transcare_bl)
 print(insurance_denied_table)
 
-```
-
-```{r}
 #Denied insurance and race odds ratio and chi square
 odds_ratio_denied <- oddsratio(insurance_denied_table)
 print(odds_ratio_denied)
@@ -162,23 +174,12 @@ print(chi_square_test_denied)
 
 ```
 
-
 ```{r}
-#Helathcare discrimination and race table
-data <- data |> 
-  mutate(dscrm_hc_bl = case_when(
-    dscrm_hc_bl %in% c("All or almost all of the time", "Don't know", "Most of the time", "Sometimes")
-    ~ "Yes",
-    TRUE ~ dscrm_hc_bl
-  ))
-
-Mistreatment_healthcare_table <- table(data$dscrm_hc_bl, data$race) 
+#Healthcare discrimination and race table
+Mistreatment_healthcare_table <- table(data$race, data$dscrm_hc_bl) 
 print(Mistreatment_healthcare_table)
 
-```
-
-```{r}
-#healthcare discrimination and race odds ratio and chisquare
+#Healthcare discrimination and race odds ratio and chisquare
 odds_ratio_mistreatment <- oddsratio(Mistreatment_healthcare_table)
 print(odds_ratio_mistreatment)
 
@@ -188,23 +189,11 @@ print(chi_square_test_mistreatment)
 
 ```
 
-
 ```{r}
 #Dr denied and race table
-data <- data |> 
-  mutate(dr_denied_transcare_bl = case_when(
-    dr_denied_transcare_bl %in% c("Yes, but not within the past 6 months", "Don't know", "Yes, within the past 6 months")
-    ~ "Yes",
-    TRUE ~ dr_denied_transcare_bl
-  ))
-
-Dr_denied_table <- table(data$dr_denied_transcare_bl, data$race)
+Dr_denied_table <- table(data$race, data$dr_denied_transcare_bl)
 print(Dr_denied_table)
 
-
-```
-
-```{r}
 #Dr denied and race odds ratio and chi square 
 odds_ratio_dr_denied <- oddsratio(Dr_denied_table)
 print(odds_ratio_dr_denied)
