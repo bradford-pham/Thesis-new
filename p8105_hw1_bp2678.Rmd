@@ -203,4 +203,110 @@ print(chi_square_test_dr_denied)
 
 ```
 
+```{r}
+#Everyday discrimination and race table 
+eds_bl_table <- table(data$race, data$eds_bl)
+print(eds_bl_table)
+
+#Everyday discriminaiton and race odds ratio and chi square 
+odds_ratio_eds_bl <- oddsratio(eds_bl_table)
+print(odds_ratio_eds_bl)
+
+chi_square_test_eds <- chisq.test(eds_bl_table)
+print(chi_square_test_eds)
+
+```
+
+
+
+```{r}
+#Bivariate analysis 
+
+#Discrimination in healthcare and everyday discrimination
+table(data$dscrm_hc_bl, data$eds_bl)
+chisq.test(table(data$dscrm_hc_bl, data$eds_bl))
+
+#Looking it by race
+table(data$dscrm_hc_bl, data$eds_bl, data$race)
+
+#chisquare test 
+
+results_discrim <- data %>%
+  group_by(race) %>%
+  summarise(
+    chisq_test = list(chisq.test(table(dscrm_hc_bl, eds_bl)))
+  )
+results_discrim <- results_discrim %>%
+  rowwise() %>%
+  mutate(
+    p_value = chisq_test$p.value,
+    statistic = chisq_test$statistic,
+    df = chisq_test$parameter
+  ) %>%
+  select(-chisq_test)
+
+print(results_discrim)
+
+```
+
+
+```{r}
+
+#insurance denial and everyday discrimination
+table(data$insurance_denied_transcare_bl, data$eds_bl)
+chisq.test(table(data$insurance_denied_transcare_bl, data$eds_bl))
+
+#Looking it by race
+table(data$insurance_denied_transcare_bl, data$eds_bl, data$race)
+
+#chisquare test 
+
+results_insurance <- data %>%
+  group_by(race) %>%
+  summarise(
+    chisq_test = list(chisq.test(table(insurance_denied_transcare_bl, eds_bl)))
+  )
+results_insurance <- results_insurance %>%
+  rowwise() %>%
+  mutate(
+    p_value = chisq_test$p.value,
+    statistic = chisq_test$statistic,
+    df = chisq_test$parameter
+  ) %>%
+  select(-chisq_test)
+
+print(results_insurance)
+```
+
+
+```{r}
+#doctor denial and everyday discrimination
+table(data$dr_denied_transcare_bl, data$eds_bl)
+chisq.test(table(data$dr_denied_transcare_bl, data$eds_bl))
+
+#Looking it by race
+table(data$dr_denied_transcare_bl, data$eds_bl, data$race)
+
+#chisquare test 
+
+results_doctor <- data %>%
+  group_by(race) %>%
+  summarise(
+    chisq_test = list(chisq.test(table(dr_denied_transcare_bl, eds_bl)))
+  )
+results_doctor <- results_doctor %>%
+  rowwise() %>%
+  mutate(
+    p_value = chisq_test$p.value,
+    statistic = chisq_test$statistic,
+    df = chisq_test$parameter
+  ) %>%
+  select(-chisq_test)
+
+print(results_doctor)
+```
+
+
+
+
 
