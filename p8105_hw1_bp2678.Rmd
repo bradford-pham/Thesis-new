@@ -11,6 +11,9 @@ output: github_document
 library(tidyverse)
 library(dplyr)
 library(epitools)
+library(broom)
+library(nnet)
+
 ```
 
 ```{r}
@@ -229,6 +232,10 @@ chisq.test(table(data$dscrm_hc_bl, data$eds_bl))
 #Looking it by race
 table(data$dscrm_hc_bl, data$eds_bl, data$race)
 
+#Has 0 cell
+#Other race low yes
+
+
 #chisquare test 
 
 results_discrim <- data %>%
@@ -258,6 +265,9 @@ chisq.test(table(data$insurance_denied_transcare_bl, data$eds_bl))
 
 #Looking it by race
 table(data$insurance_denied_transcare_bl, data$eds_bl, data$race)
+#Has 0 cell
+#Other race no low
+
 
 #chisquare test 
 
@@ -286,6 +296,9 @@ chisq.test(table(data$dr_denied_transcare_bl, data$eds_bl))
 
 #Looking it by race
 table(data$dr_denied_transcare_bl, data$eds_bl, data$race)
+#Has O cell
+#Other race yes low 
+#Other race yes medium
 
 #chisquare test 
 
@@ -305,6 +318,164 @@ results_doctor <- results_doctor %>%
 
 print(results_doctor)
 ```
+
+
+```{r}
+#Healthcare discrimination, adjusting health status 
+
+results_discrim <- data %>%
+  group_by(race) %>%
+  do({
+    model <- multinom(eds_bl ~ dscrm_hc_bl + health_bl, data = .)
+    tidy(model)
+  })
+
+results_discrim <- results_discrim %>%
+  filter(grepl("dscrm_hc_bl", term)) %>%
+  select(race, term, estimate, std.error, statistic, p.value)
+
+print(results_discrim)
+
+```
+
+```{r}
+#Healthcare discrimination, adjusting income
+
+results_discrim <- data %>%
+  group_by(race) %>%
+  do({
+    model <- multinom(eds_bl ~ dscrm_hc_bl + income_bl, data = .)
+    tidy(model)
+  })
+
+results_discrim <- results_discrim %>%
+  filter(grepl("dscrm_hc_bl", term)) %>%
+  select(race, term, estimate, std.error, statistic, p.value)
+
+print(results_discrim)
+```
+
+```{r}
+#Healthcare discrimination, adjusting education
+
+results_discrim <- data %>%
+  group_by(race) %>%
+  do({
+    model <- multinom(eds_bl ~ dscrm_hc_bl + edu_bl, data = .)
+    tidy(model)
+  })
+
+results_discrim <- results_discrim %>%
+  filter(grepl("dscrm_hc_bl", term)) %>%
+  select(race, term, estimate, std.error, statistic, p.value)
+
+print(results_discrim)
+
+
+```
+
+
+```{r}
+#insurance denied, adjusting health status
+
+results_insurance <- data %>%
+  group_by(race) %>%
+  do({
+    model <- multinom(eds_bl ~ insurance_denied_transcare_bl + health_bl, data = .)
+    tidy(model)
+  })
+
+results_insurance <- results_insurance %>%
+  filter(grepl("insurance_denied_transcare_bl", term)) %>%
+  select(race, term, estimate, std.error, statistic, p.value)
+
+print(results_insurance)
+```
+
+
+```{r}
+#insurance denied, adjusting income
+
+results_insurance <- data %>%
+  group_by(race) %>%
+  do({
+    model <- multinom(eds_bl ~ insurance_denied_transcare_bl + income_bl, data = .)
+    tidy(model)
+  })
+
+results_insurance <- results_insurance %>%
+  filter(grepl("insurance_denied_transcare_bl", term)) %>%
+  select(race, term, estimate, std.error, statistic, p.value)
+
+print(results_insurance)
+```
+
+```{r}
+#insurance denied, adjusting education
+
+results_insurance <- data %>%
+  group_by(race) %>%
+  do({
+    model <- multinom(eds_bl ~ insurance_denied_transcare_bl + edu_bl, data = .)
+    tidy(model)
+  })
+
+results_insurance <- results_insurance %>%
+  filter(grepl("insurance_denied_transcare_bl", term)) %>%
+  select(race, term, estimate, std.error, statistic, p.value)
+
+print(results_insurance)
+```
+
+```{r}
+#Doctor denial, adjusting health status
+results_doctor <- data %>%
+  group_by(race) %>%
+  do({
+    model <- multinom(eds_bl ~ dr_denied_transcare_bl + health_bl, data = .)
+    tidy(model)
+  })
+
+results_doctor <- results_doctor %>%
+  filter(grepl("dr_denied_transcare_bl", term)) %>%
+  select(race, term, estimate, std.error, statistic, p.value)
+
+print(results_doctor)
+```
+
+
+```{r}
+#Doctor denial, adjusting income
+results_doctor <- data %>%
+  group_by(race) %>%
+  do({
+    model <- multinom(eds_bl ~ dr_denied_transcare_bl + income_bl, data = .)
+    tidy(model)
+  })
+
+results_doctor <- results_doctor %>%
+  filter(grepl("dr_denied_transcare_bl", term)) %>%
+  select(race, term, estimate, std.error, statistic, p.value)
+
+print(results_doctor)
+```
+
+```{r}
+#Doctor denial, adjusting education
+results_doctor <- data %>%
+  group_by(race) %>%
+  do({
+    model <- multinom(eds_bl ~ dr_denied_transcare_bl + edu_bl, data = .)
+    tidy(model)
+  })
+
+results_doctor <- results_doctor %>%
+  filter(grepl("dr_denied_transcare_bl", term)) %>%
+  select(race, term, estimate, std.error, statistic, p.value)
+
+print(results_doctor)
+```
+
 
 
 
