@@ -1,0 +1,462 @@
+---
+title: "Thesis"
+author: "Brady Pham"
+date: 2024-06-13
+output: html_document
+---
+
+# Set Up
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(epitools)
+library(broom)
+library(nnet)
+library(lmtest)
+library(sandwich)
+
+setwd("/Users/alexfuruya/Desktop/TURNNT")
+
+data <- read.csv("TURNNT_BaselineV1_Qualtrics_CleanedString_2022-11-09.csv") %>%
+  dplyr::select(-X)
+
+# Cleaning Education variable
+data <- data %>%
+  mutate(edu_bl = case_when(
+    edu_bl == "8th grade or less" ~ "Less than High School",
+    edu_bl == "Some high school, no diploma or GED" ~ "Less than High School",
+    edu_bl == "Some college, no degree (including currently in college)" ~ "High school graduate/GED",
+    edu_bl == "Some graduate work, no graduate degree" ~ "Greater than High School",
+    edu_bl == "Bachelor's degree" ~ "Greater than High School",
+    edu_bl == "Bachelor’s degree" ~ "Greater than High School",
+    edu_bl == "Associate degree in college" ~ "Greater than High School",
+    edu_bl == "Graduate degree (Master’s/Doctoral/Professional degree)" ~ "Greater than High School",
+    TRUE ~ edu_bl 
+  ))
+
+# Cleaning Race Variable
+data <- data %>%  
+  mutate(race_ss_group_bl = "Other") %>%
+  mutate(race_ss_group_bl = ifelse(race_ss_bl == "Black", "Black", race_ss_group_bl)) %>%
+  mutate(race_ss_group_bl = ifelse(race_ss_bl == "Latinx", "Latinx", race_ss_group_bl))
+
+# Cleaning Income
+data <- data |>
+  mutate(income_bl = ifelse(income_bl %in% c("Don't know", "Prefer not to answer"), NA, income_bl)) |>
+  mutate(income_bl = case_when(
+    income_bl %in% c("No income", "$1 to  $9,999") ~ "Less than $10,000", 
+    income_bl %in% c("$10,000 to  $29,999", "$100,000 to  $149,999", "$30,000 to  $49,999",
+                     "$50,000 to  $74,999", "$75,000 to  $99,999") ~ "Greater than $10,000",
+    TRUE ~ income_bl
+  ))
+
+# Cleaning health and status
+data <- data %>%
+  mutate(health_bl = case_when(
+    health_bl == "Excellent" ~ "Good",
+    health_bl == "Good" ~ "Good",
+    health_bl == "Very Good" ~ "Good",
+    health_bl == "Fair" ~ "Fair/Poor",
+    health_bl == "Poor" ~ "Fair/Poor",
+    TRUE ~ health_bl
+  ))
+
+# Cleaning having insurance 
+data <- data %>%
+  mutate(insurance_bl = case_when(
+    insurance_bl %in% c("Yes, for all 6 months", "Yes, for part of the 6 months") ~ "Yes",
+    TRUE ~ insurance_bl
+      ))
+
+# Cleaning Denied insurance 
+data <- data |> 
+  mutate(insurance_denied_transcare_bl = ifelse(insurance_denied_transcare_bl %in% c("Don't know", "You have not asked for this"), NA, insurance_denied_transcare_bl)) |>
+  mutate(insurance_denied_transcare_bl = case_when(
+    insurance_denied_transcare_bl %in% c("Yes, but not within the past 6 months", "Yes, within the past 6 months") ~ "Yes",
+    TRUE ~ insurance_denied_transcare_bl
+  ))
+
+# Cleaning Healthcare discrimination
+data <- data |> 
+  mutate(dscrm_hc_bl = case_when(
+    dscrm_hc_bl %in% c("All or almost all of the time", "Don't know", "Most of the time", "Sometimes")
+    ~ "Yes",
+    TRUE ~ dscrm_hc_bl
+  ))
+
+# Cleaning Dr denied
+data <- data |> 
+  mutate(dr_denied_transcare_bl = case_when(
+    dr_denied_transcare_bl %in% c("Yes, but not within the past 6 months", "Don't know", "Yes, within the past 6 months")
+    ~ "Yes",
+    TRUE ~ dr_denied_transcare_bl
+  ))
+
+# Binarizing Everyday Discrimination Score
+data <- data %>%
+  mutate(eds_bl_bin = NA) %>%
+  mutate(eds_bl_bin = ifelse(eds_bl == "High" | eds_bl == "Medium", 1, eds_bl_bin)) %>%
+  mutate(eds_bl_bin = ifelse(eds_bl == "Low", 0, eds_bl_bin)) %>%
+  mutate(eds_bl_bin = factor(eds_bl_bin, levels = c(1, 0)))
+
+# Stratifying by Race
+data_black <- data %>%
+  filter(race_ss_group_bl == "Black")
+
+data_latina <- data %>%
+  filter(race_ss_group_bl == "Latinx")
+
+data_other <- data %>%
+  filter(race_ss_group_bl == "Other")
+```
+
+# Descriptive Statistics
+
+## Race and Education
+
+```{r}
+#Race and education table 
+race_education_table <- table(data$race_ss_group_bl, data$edu_bl)
+print(race_education_table)
+
+#Race and education odds ratio and chisquare
+odds_ratio_education <- oddsratio(race_education_table)
+print(odds_ratio_education)
+
+chi_square_test_education <- chisq.test(race_education_table)
+print(chi_square_test_education)
+```
+
+## Race and Income
+
+```{r}
+#Income and race table 
+race_income_table <- table(data$race_ss_group_bl, data$income_bl)
+print(race_income_table)
+
+#income and race odds ratio and income
+odds_ratio_income <- oddsratio(race_income_table)
+print(odds_ratio_income)
+
+chi_square_test_income <- chisq.test(race_income_table)
+print(chi_square_test_income)
+```
+
+## Race and Health Status
+
+```{r}
+#Health status and race table
+health_race_table <- table(data$race_ss_group_bl,data$health_bl)
+print(health_race_table)
+
+#Health status and race odds ratio and chi square
+odds_ratio_health <- oddsratio(health_race_table)
+print(odds_ratio_health)
+
+chi_square_test_health <- chisq.test(health_race_table)
+print(chi_square_test_health)
+
+```
+
+## Race and Insurance
+
+```{r}
+#Having insurance and race table
+insurance_race_table <- table(data$race_ss_group_bl, data$insurance_bl)
+print(insurance_race_table)
+
+#Having insurance and race odds ratio and chi square
+odds_ratio_insurance <- oddsratio(insurance_race_table)
+print(odds_ratio_insurance)
+
+chi_square_test_insurance <- chisq.test(insurance_race_table)
+print(chi_square_test_insurance)
+```
+
+## Race and Being Denied Trans Care by Insurance
+
+```{r}
+#Denied insurance and race table 
+insurance_denied_table <- table(data$race_ss_group_bl, data$insurance_denied_transcare_bl)
+print(insurance_denied_table)
+
+#Denied insurance and race odds ratio and chi square
+odds_ratio_denied <- oddsratio(insurance_denied_table)
+print(odds_ratio_denied)
+
+chi_square_test_denied <- chisq.test(insurance_denied_table)
+print(chi_square_test_denied)
+
+
+```
+
+## Race and Experiencing Healthcare Discrimination
+
+```{r}
+#Healthcare discrimination and race table
+Mistreatment_healthcare_table <- table(data$race_ss_group_bl, data$dscrm_hc_bl) 
+print(Mistreatment_healthcare_table)
+
+#Healthcare discrimination and race odds ratio and chisquare
+odds_ratio_mistreatment <- oddsratio(Mistreatment_healthcare_table)
+print(odds_ratio_mistreatment)
+
+chi_square_test_mistreatment <- chisq.test(Mistreatment_healthcare_table)
+print(chi_square_test_mistreatment)
+```
+## Race and Being Denied Trans Care by Doctor
+
+```{r}
+#Dr denied and race table
+Dr_denied_table <- table(data$race_ss_group_bl, data$dr_denied_transcare_bl)
+print(Dr_denied_table)
+
+#Dr denied and race odds ratio and chi square 
+odds_ratio_dr_denied <- oddsratio(Dr_denied_table)
+print(odds_ratio_dr_denied)
+
+chi_square_test_dr_denied <- chisq.test(Dr_denied_table)
+print(chi_square_test_dr_denied)
+```
+
+## Race and Experiencing Everyday Discrimination
+
+```{r}
+#Everyday discrimination and race table 
+eds_bl_table <- table(data$race_ss_group_bl, data$eds_bl_bin)
+print(eds_bl_table)
+
+#Everyday discriminaiton and race odds ratio and chi square 
+odds_ratio_eds_bl <- oddsratio(eds_bl_table)
+print(odds_ratio_eds_bl)
+
+chi_square_test_eds <- chisq.test(eds_bl_table)
+print(chi_square_test_eds)
+```
+
+# Bivariate Analysis
+
+## Effect of Healthcare Discrimination
+
+### Overall
+
+```{r}
+table(data$dscrm_hc_bl, data$eds_bl_bin)
+oddsratio(data$dscrm_hc_bl, data$eds_bl_bin)
+chisq.test(table(data$dscrm_hc_bl, data$eds_bl_bin))
+```
+
+### Among Black Women
+
+```{r}
+table(data_black$dscrm_hc_bl, data_black$eds_bl_bin)
+oddsratio(data_black$dscrm_hc_bl, data_black$eds_bl_bin)
+chisq.test(table(data_black$dscrm_hc_bl, data_black$eds_bl_bin))
+```
+### Among Latina Women
+
+```{r}
+table(data_latina$dscrm_hc_bl, data_latina$eds_bl_bin)
+oddsratio(data_latina$dscrm_hc_bl, data_latina$eds_bl_bin)
+chisq.test(table(data_latina$dscrm_hc_bl, data_latina$eds_bl_bin))
+```
+
+### Among Non-Black and Non-Latina Women
+
+```{r}
+table(data_other$dscrm_hc_bl, data_other$eds_bl_bin)
+oddsratio(data_other$dscrm_hc_bl, data_other$eds_bl_bin)
+chisq.test(table(data_other$dscrm_hc_bl, data_other$eds_bl_bin))
+```
+
+## Effect of Insurance Denying Transcare
+
+### Overall
+
+```{r}
+table(data$insurance_denied_transcare_bl, data$eds_bl_bin)
+oddsratio(data$insurance_denied_transcare_bl, data$eds_bl_bin)
+chisq.test(table(data$insurance_denied_transcare_bl, data$eds_bl_bin))
+```
+
+### Among Black Women
+
+```{r}
+table(data_black$insurance_denied_transcare_bl, data_black$eds_bl_bin)
+oddsratio(data_black$insurance_denied_transcare_bl, data_black$eds_bl_bin)
+chisq.test(table(data_black$insurance_denied_transcare_bl, data_black$eds_bl_bin))
+```
+### Among Latina Women
+
+```{r}
+table(data_latina$insurance_denied_transcare_bl, data_latina$eds_bl_bin)
+oddsratio(data_latina$insurance_denied_transcare_bl, data_latina$eds_bl_bin)
+chisq.test(table(data_latina$insurance_denied_transcare_bl, data_latina$eds_bl_bin))
+```
+
+### Among Non-Black and Non-Latina Women
+
+```{r}
+table(data_other$insurance_denied_transcare_bl, data_other$eds_bl_bin)
+oddsratio(data_other$insurance_denied_transcare_bl, data_other$eds_bl_bin)
+chisq.test(table(data_other$insurance_denied_transcare_bl, data_other$eds_bl_bin))
+```
+
+## Effect of Doctor Denying Transcare
+
+### Overall
+
+```{r}
+table(data$dr_denied_transcare_bl, data$eds_bl_bin)
+oddsratio(data$dr_denied_transcare_bl, data$eds_bl_bin)
+chisq.test(table(data$dr_denied_transcare_bl, data$eds_bl_bin))
+```
+
+### Among Black Women
+
+```{r}
+table(data_black$dr_denied_transcare_bl, data_black$eds_bl_bin)
+oddsratio(data_black$dr_denied_transcare_bl, data_black$eds_bl_bin)
+chisq.test(table(data_black$dr_denied_transcare_bl, data_black$eds_bl_bin))
+```
+### Among Latina Women
+
+```{r}
+table(data_latina$dr_denied_transcare_bl, data_latina$eds_bl_bin)
+oddsratio(data_latina$dr_denied_transcare_bl, data_latina$eds_bl_bin)
+chisq.test(table(data_latina$dr_denied_transcare_bl, data_latina$eds_bl_bin))
+```
+
+### Among Non-Black and Non-Latina Women
+
+```{r}
+table(data_other$dr_denied_transcare_bl, data_other$eds_bl_bin)
+oddsratio(data_other$dr_denied_transcare_bl, data_other$eds_bl_bin)
+chisq.test(table(data_other$dr_denied_transcare_bl, data_other$eds_bl_bin))
+```
+
+# Multivariable Analysis
+
+## Effect of Healthcare Discrimination
+
+### Overall
+
+```{r}
+exp(coeftest(glm(as.numeric(eds_bl_bin) ~ dscrm_hc_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data), 
+              vcov = sandwich))
+
+exp(confint(glm(as.numeric(eds_bl_bin) ~ dscrm_hc_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data), 
+              vcov = sandwich))
+```
+
+### Among Black Women
+
+```{r}
+exp(coeftest(glm(as.numeric(eds_bl_bin) ~ dscrm_hc_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data_black), 
+              vcov = sandwich))
+
+exp(confint(glm(as.numeric(eds_bl_bin) ~ dscrm_hc_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data_black), 
+              vcov = sandwich))
+```
+### Among Latina Women
+
+```{r}
+exp(coeftest(glm(as.numeric(eds_bl_bin) ~ dscrm_hc_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data_latina), 
+              vcov = sandwich))
+
+exp(confint(glm(as.numeric(eds_bl_bin) ~ dscrm_hc_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data_latina), 
+              vcov = sandwich))
+```
+
+### Among Non-Black and Non-Latina Women
+
+```{r}
+exp(coeftest(glm(as.numeric(eds_bl_bin) ~ dscrm_hc_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data_other), 
+              vcov = sandwich))
+
+exp(confint(glm(as.numeric(eds_bl_bin) ~ dscrm_hc_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data_other), 
+              vcov = sandwich))
+```
+
+## Effect of Insurance Denying Transcare
+
+### Overall
+
+```{r}
+exp(coeftest(glm(as.numeric(eds_bl_bin) ~ insurance_denied_transcare_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data), 
+              vcov = sandwich))
+
+exp(confint(glm(as.numeric(eds_bl_bin) ~ insurance_denied_transcare_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data), 
+              vcov = sandwich))
+```
+
+### Among Black Women
+
+```{r}
+exp(coeftest(glm(as.numeric(eds_bl_bin) ~ insurance_denied_transcare_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data_black), 
+              vcov = sandwich))
+
+exp(confint(glm(as.numeric(eds_bl_bin) ~ insurance_denied_transcare_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data_black), 
+              vcov = sandwich))
+```
+### Among Latina Women
+
+```{r}
+exp(coeftest(glm(as.numeric(eds_bl_bin) ~ insurance_denied_transcare_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data_latina), 
+              vcov = sandwich))
+
+exp(confint(glm(as.numeric(eds_bl_bin) ~ insurance_denied_transcare_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data_latina), 
+              vcov = sandwich))
+```
+
+### Among Non-Black and Non-Latina Women
+
+```{r}
+exp(coeftest(glm(as.numeric(eds_bl_bin) ~ insurance_denied_transcare_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data_other), 
+              vcov = sandwich))
+
+exp(confint(glm(as.numeric(eds_bl_bin) ~ insurance_denied_transcare_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data_other), 
+              vcov = sandwich))
+```
+
+## Effect of Doctor Denying Transcare
+
+### Overall
+
+```{r}
+exp(coeftest(glm(as.numeric(eds_bl_bin) ~ dr_denied_transcare_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data), 
+              vcov = sandwich))
+
+exp(confint(glm(as.numeric(eds_bl_bin) ~ dr_denied_transcare_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data), 
+              vcov = sandwich))
+```
+
+### Among Black Women
+
+```{r}
+exp(coeftest(glm(as.numeric(eds_bl_bin) ~ dr_denied_transcare_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data_black), 
+              vcov = sandwich))
+
+exp(confint(glm(as.numeric(eds_bl_bin) ~ dr_denied_transcare_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data_black), 
+              vcov = sandwich))
+```
+### Among Latina Women
+
+```{r}
+exp(coeftest(glm(as.numeric(eds_bl_bin) ~ dr_denied_transcare_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data_latina), 
+              vcov = sandwich))
+
+exp(confint(glm(as.numeric(eds_bl_bin) ~ dr_denied_transcare_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data_latina), 
+              vcov = sandwich))
+```
+
+### Among Non-Black and Non-Latina Women
+
+```{r}
+exp(coeftest(glm(as.numeric(eds_bl_bin) ~ dr_denied_transcare_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data_other), 
+              vcov = sandwich))
+
+exp(confint(glm(as.numeric(eds_bl_bin) ~ dr_denied_transcare_bl + health_bl + age_cat_bl + income_bl + edu_cat_bl, family=poisson(link=log), data = data_other), 
+              vcov = sandwich))
+```
